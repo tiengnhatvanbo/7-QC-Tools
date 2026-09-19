@@ -53,7 +53,7 @@
 
     <div class="flex items-center space-x-2">
       <!-- Trạng thái xác thực Pi Network -->
-      <div id="piUserBadge" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 cursor-pointer" onclick="initPiNetwork(true)">
+      <div id="piUserBadge" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 cursor-pointer" onclick="signInWithPi()">
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
         <span id="piUserName">Kết nối Pi...</span>
       </div>
@@ -196,7 +196,7 @@
 
       <!-- 3. PHÔNG CHỮ & CỠ CHỮ -->
       <div class="space-y-3 border-t border-slate-100 pt-4">
-        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Phông Chữ & Cỡ Chữ</span>
+        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Phông Chữ & Cỡ ChỮ</span>
         <div>
           <label class="text-xs text-slate-600 block mb-1">Kiểu Phông (Font Family)</label>
           <select id="cfgFontFamily" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50">
@@ -256,35 +256,33 @@
   </div>
 
   <script>
-    // --- GỬI ACCESS TOKEN CHO PI APP STUDIO ---
-    let piUser = null;
-    let piAccessToken = null;
+    // --- PI NETWORK AUTHENTICATION ---
+    let sessionToken = null;
+    let currentUser = null;
 
-    function sendTokenToAppStudio(accessToken, user) {
-      const payload = {
-        type: "PI_AUTH_SUCCESS",
-        accessToken: accessToken,
-        user: user
-      };
-      
-      // Gửi postMessage tới window mẹ (iframe runner của App Studio)
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(payload, "*");
-      }
-      if (window.opener) {
-        window.opener.postMessage(payload, "*");
-      }
-
-      // Lưu trữ phiên đăng nhập
-      try {
-        localStorage.setItem("pi_access_token", accessToken);
-        if (user) localStorage.setItem("pi_user", JSON.stringify(user));
-      } catch (e) {}
+    function onIncompletePaymentFound(payment) {
+      console.log("Incomplete payment found:", payment);
     }
 
-    async function initPiNetwork(manual = false) {
+    async function exchangeTokenWithAppStudio(accessToken) {
+      const response = await fetch("https://backend.appstudio-u7cm9zhmha0ruwv8.piappengine.com/pi/auth/v1/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ accessToken })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Authentication exchange failed: ${response.status}`);
+      }
+
+      return await response.json();
+    }
+
+    async function signInWithPi() {
+      const badge = document.getElementById('piUserBadge');
       if (typeof window.Pi === 'undefined') {
-        const badge = document.getElementById('piUserBadge');
         if (badge) badge.innerHTML = '<span class="text-slate-500">Chế độ Web thông thường</span>';
         return;
       }
@@ -292,29 +290,22 @@
       try {
         await window.Pi.init({ version: "2.0" });
 
-        const scopes = ['username'];
-        function onIncompletePaymentFound(payment) {
-          console.log("Incomplete payment found:", payment);
-        }
+        const authResult = await window.Pi.authenticate(["username"], onIncompletePaymentFound);
+        const accessToken = authResult.accessToken;
 
-        const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
-        piUser = authResult.user;
-        piAccessToken = authResult.accessToken;
+        const authData = await exchangeTokenWithAppStudio(accessToken);
+        sessionToken = authData.sessionToken;
+        currentUser = authData.user;
 
-        // BẮT BUỘC: Bắn token về App Studio để hệ thống xác nhận Verified
-        sendTokenToAppStudio(piAccessToken, piUser);
-
-        const badge = document.getElementById('piUserBadge');
-        if (badge && piUser) {
+        if (badge && currentUser) {
           badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-900";
-          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>@${piUser.username}</span>`;
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>@${currentUser.username}</span>`;
         }
       } catch (err) {
-        console.warn("Pi Auth warning/cancelled:", err);
-        const badge = document.getElementById('piUserBadge');
+        console.error("Pi authentication error:", err);
         if (badge) {
           badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600";
-          badge.innerHTML = `<span>Khách (Bấm để đăng nhập Pi)</span>`;
+          badge.innerHTML = `<span>Chưa đăng nhập (Bấm để thử lại)</span>`;
         }
       }
     }
@@ -711,7 +702,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       render();
-      initPiNetwork();
+      signInWithPi();
     });
   </script>
 </body>
