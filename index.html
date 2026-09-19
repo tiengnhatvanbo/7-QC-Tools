@@ -53,7 +53,7 @@
 
     <div class="flex items-center space-x-2">
       <!-- Trạng thái xác thực Pi Network -->
-      <div id="piUserBadge" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900">
+      <div id="piUserBadge" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 cursor-pointer" onclick="initPiNetwork(true)">
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
         <span id="piUserName">Kết nối Pi...</span>
       </div>
@@ -256,11 +256,33 @@
   </div>
 
   <script>
-    // --- KHỞI TẠO VÀ XÁC THỰC PI NETWORK SDK ---
+    // --- GỬI ACCESS TOKEN CHO PI APP STUDIO ---
     let piUser = null;
     let piAccessToken = null;
 
-    async function initPiNetwork() {
+    function sendTokenToAppStudio(accessToken, user) {
+      const payload = {
+        type: "PI_AUTH_SUCCESS",
+        accessToken: accessToken,
+        user: user
+      };
+      
+      // Gửi postMessage tới window mẹ (iframe runner của App Studio)
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(payload, "*");
+      }
+      if (window.opener) {
+        window.opener.postMessage(payload, "*");
+      }
+
+      // Lưu trữ phiên đăng nhập
+      try {
+        localStorage.setItem("pi_access_token", accessToken);
+        if (user) localStorage.setItem("pi_user", JSON.stringify(user));
+      } catch (e) {}
+    }
+
+    async function initPiNetwork(manual = false) {
       if (typeof window.Pi === 'undefined') {
         const badge = document.getElementById('piUserBadge');
         if (badge) badge.innerHTML = '<span class="text-slate-500">Chế độ Web thông thường</span>';
@@ -279,6 +301,9 @@
         piUser = authResult.user;
         piAccessToken = authResult.accessToken;
 
+        // BẮT BUỘC: Bắn token về App Studio để hệ thống xác nhận Verified
+        sendTokenToAppStudio(piAccessToken, piUser);
+
         const badge = document.getElementById('piUserBadge');
         if (badge && piUser) {
           badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-900";
@@ -289,7 +314,7 @@
         const badge = document.getElementById('piUserBadge');
         if (badge) {
           badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600";
-          badge.innerHTML = `<span>Khách</span>`;
+          badge.innerHTML = `<span>Khách (Bấm để đăng nhập Pi)</span>`;
         }
       }
     }
