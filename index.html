@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7 QC Tools - Biểu Đồ Pareto & Histogram</title>
+  <!-- Tailwind CSS & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Inter:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .drawer-open { transform: translateX(0); }
+    .drawer-closed { transform: translateX(100%); }
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0;
+      background: none;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased select-none">
+
+  <!-- Header Điều Khiển -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-5 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-4">
+      <!-- Logo 7 QC Tools -->
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-extrabold text-sm shadow-sm tracking-tighter">7QC</div>
+        <span class="font-extrabold text-lg tracking-tight text-slate-900">7 QC Tools</span>
+      </div>
+
+      <!-- Nút Chuyển Loại Biểu Đồ -->
+      <div class="bg-slate-100 p-1 rounded-xl flex space-x-1 border border-slate-200">
+        <button id="btnModePareto" onclick="switchChartType('pareto')" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-black transition">Pareto (80/20)</button>
+        <button id="btnModeHist" onclick="switchChartType('histogram')" class="px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-black shadow-sm transition">Histogram + Giới Hạn Min/Max</button>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2">
+      <button onclick="toggleModal(true)" class="px-4 py-2 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl transition flex items-center space-x-2 shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>Dán / Nạp Dữ Liệu</span>
+      </button>
+      <button onclick="toggleDrawer(true)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold rounded-xl transition flex items-center space-x-1.5 border border-slate-300">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>Cài Đặt</span>
+      </button>
+      <button onclick="downloadChart()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span>Tải Ảnh PNG</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Màn Hình Chính -->
+  <main class="flex-1 p-5 flex flex-col space-y-4">
+    <div id="statsBar" class="grid grid-cols-2 md:grid-cols-6 gap-3"></div>
+
+    <div class="flex-1 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative min-h-[500px] flex flex-col">
+      <div class="relative w-full flex-1 min-h-[460px]">
+        <canvas id="qcCanvas"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: DÁN DỮ LIỆU -->
+  <div id="dataModal" class="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl border border-slate-200 shadow-2xl p-6">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h3 class="text-lg font-extrabold text-slate-900">Dán / Nạp Dữ Liệu</h3>
+          <p class="text-xs text-slate-500">Dán trực tiếp từ bảng tính Excel hoặc dãy số đo thực nghiệm</p>
+        </div>
+        <button onclick="toggleModal(false)" class="text-slate-400 hover:text-black text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-3">
+        <textarea id="dataInput" rows="10" class="w-full border border-slate-200 rounded-xl p-3 font-mono text-xs focus:ring-2 focus:ring-black focus:outline-none bg-slate-50" placeholder="Dán số liệu vào đây..."></textarea>
+        
+        <div class="flex justify-between items-center">
+          <div class="flex space-x-2">
+            <button onclick="loadSample('pareto')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Mẫu Pareto</button>
+            <button onclick="loadSample('hist')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Mẫu Kích Thước CNC (Hist)</button>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="toggleModal(false)" class="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:text-black">Hủy</button>
+            <button onclick="applyUserData()" class="px-5 py-2 text-xs font-bold bg-black text-white rounded-xl hover:bg-slate-800 transition">Vẽ Biểu Đồ Ngay</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER: CÀI ĐẶT -->
+  <div id="settingsDrawer" class="fixed inset-y-0 right-0 w-96 bg-white border-l border-slate-200 shadow-2xl z-40 drawer-closed transition-transform duration-300 p-6 flex flex-col justify-between overflow-y-auto">
+    <div class="space-y-6">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+        <h3 class="text-base font-extrabold text-slate-900">Cài Đặt Biểu Đồ</h3>
+        <button onclick="toggleDrawer(false)" class="text-slate-400 hover:text-black text-2xl leading-none">&times;</button>
+      </div>
+
+      <!-- 1. TIÊU ĐỀ BIỂU ĐỒ & TRỤC TỌA ĐỘ -->
+      <div class="space-y-3">
+        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Tiêu Đề & Tên Trục</span>
+        <div>
+          <label class="text-xs text-slate-600 block mb-1">Tiêu Đề Chính Biểu Đồ</label>
+          <input type="text" id="cfgMainTitle" value="Biểu Đồ Phân Bố Tần Suất Kích Thước Sản Phẩm" oninput="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 font-medium">
+        </div>
+        <div>
+          <label class="text-xs text-slate-600 block mb-1">Tiêu Đề Trục Hoành (Trục X)</label>
+          <input type="text" id="cfgAxisXTitle" value="Kích thước đo kiểm thực tế (mm)" oninput="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 font-medium">
+        </div>
+        <div>
+          <label class="text-xs text-slate-600 block mb-1">Tiêu Đề Trục Tung Bên Trái (Trục Y)</label>
+          <input type="text" id="cfgAxisYTitle" value="Tần suất xuất hiện" oninput="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 font-medium">
+        </div>
+        <div id="cfgGroupY1Title" class="hidden">
+          <label class="text-xs text-slate-600 block mb-1">Tiêu Đề Trục Tung Bên Phải (Trục Y1)</label>
+          <input type="text" id="cfgAxisY1Title" value="Phần trăm tích lũy (%)" oninput="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 font-medium">
+        </div>
+      </div>
+
+      <!-- 2. CÀI ĐẶT MÀU SẮC & ĐƯỜNG VIỀN CỘT -->
+      <div class="space-y-3 border-t border-slate-100 pt-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Màu Sắc & Đường Viền</span>
+          <button onclick="resetColors()" class="text-[11px] text-blue-600 hover:underline">Mặc định</button>
+        </div>
+
+        <!-- Màu cho Histogram -->
+        <div id="colorGroupHist" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Màu Cột (Fill)</span>
+            <input type="color" id="colHistBar" value="#0284c7" onchange="render()">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Màu Viền Cột (Border)</span>
+            <input type="color" id="colHistBorder" value="#ffffff" onchange="render()">
+          </div>
+          <div class="space-y-1 pt-1">
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-slate-700 font-medium">Độ Dày Viền Cột</span>
+              <span id="lblHistBorderWidth" class="text-xs font-bold text-slate-800">2px</span>
+            </div>
+            <input type="range" id="cfgHistBorderWidth" min="1" max="4" value="2" oninput="document.getElementById('lblHistBorderWidth').innerText = this.value + 'px'; render();" class="w-full">
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-slate-700 font-medium">Đường Chuẩn Gauss</span>
+            <input type="color" id="colHistGauss" value="#0f172a" onchange="render()">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Vạch Giới Hạn Min / Max</span>
+            <input type="color" id="colHistLimits" value="#ef4444" onchange="render()">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Màu Vùng Ngoài Giới Hạn</span>
+            <input type="color" id="colHistShade" value="#64748b" onchange="render()">
+          </div>
+        </div>
+
+        <!-- Màu cho Pareto -->
+        <div id="colorGroupPareto" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200 hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Lỗi Trọng Yếu (Vital Few)</span>
+            <input type="color" id="colParetoVital" value="#ea580c" onchange="render()">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Lỗi Phụ (Useful Many)</span>
+            <input type="color" id="colParetoOther" value="#94a3b8" onchange="render()">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-700 font-medium">Đường Tích Lũy (%)</span>
+            <input type="color" id="colParetoLine" value="#059669" onchange="render()">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. PHÔNG CHỮ & CỠ CHỮ -->
+      <div class="space-y-3 border-t border-slate-100 pt-4">
+        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Phông Chữ & Cỡ Chữ</span>
+        <div>
+          <label class="text-xs text-slate-600 block mb-1">Kiểu Phông (Font Family)</label>
+          <select id="cfgFontFamily" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50">
+            <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
+            <option value="'Inter', sans-serif">Inter</option>
+            <option value="'Roboto', sans-serif">Roboto</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] text-slate-500 block">Cỡ số trục (px)</label>
+            <input type="number" id="cfgTickSize" value="12" min="8" max="22" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-1.5">
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block">Cỡ tiêu đề (px)</label>
+            <input type="number" id="cfgTitleSize" value="15" min="10" max="28" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-1.5">
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. DUNG SAI & GIỚI HẠN (HISTOGRAM) -->
+      <div class="space-y-3 border-t border-slate-100 pt-4">
+        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Dung Sai Bản Vẽ (Spec Limits)</span>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] text-slate-500 block font-semibold text-rose-600">Min (LSL)</label>
+            <input type="number" id="cfgLSL" step="any" value="19.85" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-1.5">
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block font-semibold text-rose-600">Max (USL)</label>
+            <input type="number" id="cfgUSL" step="any" value="20.15" onchange="render()" class="w-full text-xs border border-slate-200 rounded-lg p-1.5">
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="cfgShadeOOS" checked onchange="render()" class="w-4 h-4 text-black rounded border-slate-300">
+          <label for="cfgShadeOOS" class="text-xs text-slate-700 font-medium">Bôi màu phần ngoài Min/Max</label>
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-500 block">Số khoảng chia cột (Bins): <span id="lblBins" class="font-bold text-black">10</span></label>
+          <input type="range" id="cfgBins" min="5" max="25" value="10" oninput="document.getElementById('lblBins').innerText = this.value; render();" class="w-full">
+        </div>
+      </div>
+
+      <!-- 5. TÙY CHỌN PARETO -->
+      <div class="space-y-3 border-t border-slate-100 pt-4">
+        <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Tùy Chọn Pareto</span>
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-slate-600">Đường chuẩn cắt (%):</label>
+          <input type="number" id="cfgParetoCut" value="80" min="50" max="95" onchange="render()" class="w-20 text-xs border border-slate-200 rounded-lg p-1.5 text-right">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="toggleDrawer(false)" class="w-full py-2.5 bg-black text-white text-xs font-bold rounded-xl mt-6">Đóng & Lưu Cài Đặt</button>
+  </div>
+
+  <script>
+    let currentMode = 'histogram';
+    let chartInstance = null;
+
+    const SAMPLES = {
+      pareto: `Trầy xước bề mặt\t65\nLệch tâm gia công\t38\nBavia cạnh\t22\nKích thước quá dung sai\t14\nNứt gãy vi mô\t8\nCháy ren\t4\nKhác\t2`,
+      hist: `20.02, 19.98, 20.05, 20.12, 19.89, 20.01, 19.95, 20.18, 19.82, 20.08, 19.99, 20.03, 20.11, 19.92, 19.88, 20.04, 20.07, 20.14, 19.86, 20.01, 19.97, 20.09, 19.91, 20.16, 19.84, 20.03, 20.06, 19.94, 20.02, 20.10, 19.90, 20.05, 19.87, 20.13, 20.00, 19.98, 20.04, 20.08, 19.93, 20.15`
+    };
+
+    let activeDataText = SAMPLES.hist;
+
+    function hexToRgba(hex, alpha) {
+      let r = 0, g = 0, b = 0;
+      if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+      } else if (hex.length === 7) {
+        r = parseInt(hex.substring(1, 3), 16);
+        g = parseInt(hex.substring(3, 5), 16);
+        b = parseInt(hex.substring(5, 7), 16);
+      }
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    const qcPlugin = {
+      id: 'qcPlugin',
+      beforeDraw(chart) {
+        if (currentMode !== 'histogram') return;
+        const meta = chart.getDatasetMeta(1);
+        if (!meta || !meta.data || meta.data.length === 0) return;
+
+        const ctx = chart.ctx;
+        const xAxis = chart.scales.x;
+        const yAxis = chart.scales.y;
+        const shade = document.getElementById('cfgShadeOOS').checked;
+        const lsl = parseFloat(document.getElementById('cfgLSL').value);
+        const usl = parseFloat(document.getElementById('cfgUSL').value);
+        const shadeColorHex = document.getElementById('colHistShade').value;
+        const limitsColor = document.getElementById('colHistLimits').value;
+
+        if (shade && (!isNaN(lsl) || !isNaN(usl))) {
+          ctx.save();
+          ctx.fillStyle = hexToRgba(shadeColorHex, 0.35);
+          
+          for (let i = 0; i < meta.data.length - 1; i++) {
+            const p1 = meta.data[i];
+            const p2 = meta.data[i+1];
+            const val = chart.data.datasets[1].data[i].x;
+
+            if ((!isNaN(lsl) && val <= lsl) || (!isNaN(usl) && val >= usl)) {
+              ctx.beginPath();
+              ctx.moveTo(p1.x, yAxis.bottom);
+              ctx.lineTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.lineTo(p2.x, yAxis.bottom);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
+
+        const drawLine = (val, text) => {
+          if (isNaN(val)) return;
+          const x = xAxis.getPixelForValue(val);
+          if (x >= xAxis.left && x <= xAxis.right) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([5, 4]);
+            ctx.strokeStyle = limitsColor;
+            ctx.lineWidth = 2;
+            ctx.moveTo(x, yAxis.top);
+            ctx.lineTo(x, yAxis.bottom);
+            ctx.stroke();
+
+            ctx.fillStyle = limitsColor;
+            ctx.font = `bold 11px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${text}: ${val}`, x, yAxis.top - 6);
+            ctx.restore();
+          }
+        };
+
+        drawLine(lsl, 'MIN (LSL)');
+        drawLine(usl, 'MAX (USL)');
+      }
+    };
+
+    Chart.register(qcPlugin);
+
+    function switchChartType(mode) {
+      currentMode = mode;
+      document.getElementById('btnModePareto').className = mode === 'pareto' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-black shadow-sm transition' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-black transition';
+      document.getElementById('btnModeHist').className = mode === 'histogram' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-black shadow-sm transition' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-black transition';
+      
+      document.getElementById('colorGroupHist').classList.toggle('hidden', mode !== 'histogram');
+      document.getElementById('colorGroupPareto').classList.toggle('hidden', mode !== 'pareto');
+      document.getElementById('cfgGroupY1Title').classList.toggle('hidden', mode !== 'pareto');
+
+      // Tự động điều chỉnh tiêu đề mẫu tương ứng
+      if (mode === 'pareto') {
+        document.getElementById('cfgMainTitle').value = 'Biểu Đồ Pareto Phân Tích Lỗi Sản Phẩm (Quy Tắc 80/20)';
+        document.getElementById('cfgAxisXTitle').value = 'Dạng lỗi / Khuyết tật';
+        document.getElementById('cfgAxisYTitle').value = 'Số lượng lỗi';
+      } else {
+        document.getElementById('cfgMainTitle').value = 'Biểu Đồ Phân Bố Tần Suất Kích Thước Sản Phẩm';
+        document.getElementById('cfgAxisXTitle').value = 'Kích thước đo kiểm thực tế (mm)';
+        document.getElementById('cfgAxisYTitle').value = 'Tần suất xuất hiện';
+      }
+
+      activeDataText = SAMPLES[mode === 'pareto' ? 'pareto' : 'hist'];
+      render();
+    }
+
+    function toggleModal(open) {
+      document.getElementById('dataModal').classList.toggle('hidden', !open);
+      if (open) document.getElementById('dataInput').value = activeDataText;
+    }
+
+    function toggleDrawer(open) {
+      const el = document.getElementById('settingsDrawer');
+      if (open) { el.classList.remove('drawer-closed'); el.classList.add('drawer-open'); }
+      else { el.classList.add('drawer-closed'); el.classList.remove('drawer-open'); }
+    }
+
+    function loadSample(type) {
+      document.getElementById('dataInput').value = SAMPLES[type];
+      if (type === 'pareto') switchChartType('pareto');
+      else switchChartType('histogram');
+      applyUserData();
+    }
+
+    function applyUserData() {
+      activeDataText = document.getElementById('dataInput').value.trim();
+      toggleModal(false);
+      render();
+    }
+
+    function resetColors() {
+      document.getElementById('colHistBar').value = '#0284c7';
+      document.getElementById('colHistBorder').value = '#ffffff';
+      document.getElementById('cfgHistBorderWidth').value = 2;
+      document.getElementById('lblHistBorderWidth').innerText = '2px';
+      document.getElementById('colHistGauss').value = '#0f172a';
+      document.getElementById('colHistLimits').value = '#ef4444';
+      document.getElementById('colHistShade').value = '#64748b';
+      document.getElementById('colParetoVital').value = '#ea580c';
+      document.getElementById('colParetoOther').value = '#94a3b8';
+      document.getElementById('colParetoLine').value = '#059669';
+      render();
+    }
+
+    function render() {
+      const ctx = document.getElementById('qcCanvas');
+      if (chartInstance) chartInstance.destroy();
+
+      const fontFam = document.getElementById('cfgFontFamily').value;
+      const tickSize = parseInt(document.getElementById('cfgTickSize').value) || 12;
+      const titleSize = parseInt(document.getElementById('cfgTitleSize').value) || 15;
+      const mainTitle = document.getElementById('cfgMainTitle').value;
+      const axisXTitle = document.getElementById('cfgAxisXTitle').value;
+      const axisYTitle = document.getElementById('cfgAxisYTitle').value;
+      const axisY1Title = document.getElementById('cfgAxisY1Title').value;
+
+      if (currentMode === 'pareto') {
+        renderPareto(ctx, fontFam, tickSize, titleSize, mainTitle, axisXTitle, axisYTitle, axisY1Title);
+      } else {
+        renderHistogram(ctx, fontFam, tickSize, titleSize, mainTitle, axisXTitle, axisYTitle);
+      }
+    }
+
+    function renderPareto(canvas, fontFam, tickSize, titleSize, mainTitle, axisXTitle, axisYTitle, axisY1Title) {
+      const lines = activeDataText.split('\n').filter(l => l.trim() !== '');
+      let data = [];
+      lines.forEach(l => {
+        const parts = l.split(/[\t,;]+/).map(s => s.trim());
+        if (parts.length >= 2) {
+          const count = parseFloat(parts[1]);
+          if (!isNaN(count)) data.push({ label: parts[0], count: count });
+        }
+      });
+
+      if (data.length === 0) return;
+      data.sort((a, b) => b.count - a.count);
+
+      const total = data.reduce((s, i) => s + i.count, 0);
+      let running = 0;
+      const cumPercentages = data.map(d => {
+        running += d.count;
+        return parseFloat(((running / total) * 100).toFixed(1));
+      });
+
+      const cutOff = parseFloat(document.getElementById('cfgParetoCut').value) || 80;
+      const vitalColor = document.getElementById('colParetoVital').value;
+      const otherColor = document.getElementById('colParetoOther').value;
+      const lineColor = document.getElementById('colParetoLine').value;
+
+      const bgColors = cumPercentages.map((p, idx) => {
+        const prev = idx === 0 ? 0 : cumPercentages[idx-1];
+        return prev < cutOff ? vitalColor : otherColor;
+      });
+
+      const vitalCount = cumPercentages.filter((p, i) => (i === 0 ? 0 : cumPercentages[i-1]) < cutOff).length;
+      document.getElementById('statsBar').innerHTML = `
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Tổng Số Lỗi</div><div class="text-xl font-black text-black">${total}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Dạng Lỗi (Categories)</div><div class="text-xl font-black text-black">${data.length}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-amber-600 font-bold uppercase">Lỗi Trọng Yếu (Vital Few)</div><div class="text-xl font-black text-amber-600">${vitalCount} lỗi</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-emerald-600 font-bold uppercase">Ngưỡng Pareto</div><div class="text-xl font-black text-emerald-600">${cutOff}%</div></div>
+      `;
+
+      chartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.label),
+          datasets: [
+            {
+              type: 'line',
+              label: 'Phần trăm tích lũy (%)',
+              data: cumPercentages,
+              borderColor: lineColor,
+              backgroundColor: lineColor,
+              borderWidth: 2.5,
+              yAxisID: 'y1',
+              pointRadius: 4
+            },
+            {
+              type: 'bar',
+              label: 'Tần suất (Số lỗi)',
+              data: data.map(d => d.count),
+              backgroundColor: bgColors,
+              borderRadius: 4,
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: !!mainTitle.trim(),
+              text: mainTitle,
+              font: { family: fontFam, size: titleSize + 3, weight: '800' },
+              color: '#0f172a',
+              padding: { bottom: 15 }
+            },
+            legend: { labels: { font: { family: fontFam, size: tickSize, weight: 'bold' } } }
+          },
+          scales: {
+            x: {
+              ticks: { font: { family: fontFam, size: tickSize } },
+              title: { display: !!axisXTitle.trim(), text: axisXTitle, font: { family: fontFam, size: titleSize, weight: 'bold' } }
+            },
+            y: {
+              position: 'left',
+              beginAtZero: true,
+              ticks: { font: { family: fontFam, size: tickSize } },
+              title: { display: !!axisYTitle.trim(), text: axisYTitle, font: { family: fontFam, size: titleSize, weight: 'bold' } }
+            },
+            y1: {
+              position: 'right',
+              min: 0,
+              max: 100,
+              grid: { drawOnChartArea: false },
+              ticks: { font: { family: fontFam, size: tickSize }, callback: v => v + '%' },
+              title: { display: !!axisY1Title.trim(), text: axisY1Title, font: { family: fontFam, size: titleSize, weight: 'bold' } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderHistogram(canvas, fontFam, tickSize, titleSize, mainTitle, axisXTitle, axisYTitle) {
+      const numbers = activeDataText.split(/[\s,;\n\t]+/).map(Number).filter(n => !isNaN(n) && isFinite(n));
+      if (numbers.length < 3) return;
+
+      const n = numbers.length;
+      const mean = numbers.reduce((a, b) => a + b, 0) / n;
+      const variance = numbers.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+      const std = Math.sqrt(variance);
+      const min = Math.min(...numbers);
+      const max = Math.max(...numbers);
+
+      const numBins = parseInt(document.getElementById('cfgBins').value) || 10;
+      const lsl = parseFloat(document.getElementById('cfgLSL').value);
+      const usl = parseFloat(document.getElementById('cfgUSL').value);
+
+      const barColor = document.getElementById('colHistBar').value;
+      const borderColor = document.getElementById('colHistBorder').value;
+      const borderWidth = parseInt(document.getElementById('cfgHistBorderWidth').value) || 2;
+      const gaussColor = document.getElementById('colHistGauss').value;
+
+      const binWidth = (max - min) / numBins;
+      const bins = Array(numBins).fill(0);
+      const binCenters = [];
+
+      for (let i = 0; i < numBins; i++) {
+        binCenters.push(min + (i + 0.5) * binWidth);
+      }
+
+      numbers.forEach(val => {
+        let idx = Math.floor((val - min) / binWidth);
+        if (idx >= numBins) idx = numBins - 1;
+        bins[idx]++;
+      });
+
+      const stepGauss = (max - min) / 60;
+      const gaussData = [];
+      for (let x = min - binWidth; x <= max + binWidth; x += stepGauss) {
+        const y = (1 / (std * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mean) / std, 2));
+        gaussData.push({ x: x, y: y * n * binWidth });
+      }
+
+      let cp = '--', cpk = '--';
+      if (!isNaN(lsl) && !isNaN(usl) && std > 0) {
+        cp = ((usl - lsl) / (6 * std)).toFixed(2);
+        const cpkUpper = (usl - mean) / (3 * std);
+        const cpkLower = (mean - lsl) / (3 * std);
+        cpk = Math.min(cpkUpper, cpkLower).toFixed(2);
+      }
+
+      document.getElementById('statsBar').innerHTML = `
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Cỡ Mẫu (N)</div><div class="text-xl font-black text-black">${n}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Trung Bình (&mu;)</div><div class="text-xl font-black text-black">${mean.toFixed(3)}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Độ Lệch Chuẩn (&sigma;)</div><div class="text-xl font-black text-black">${std.toFixed(4)}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Chỉ Số Cp</div><div class="text-xl font-black ${parseFloat(cp) >= 1.33 ? 'text-emerald-600':'text-amber-600'}">${cp}</div></div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200"><div class="text-[11px] text-slate-500 font-bold uppercase">Chỉ Số Cpk</div><div class="text-xl font-black ${parseFloat(cpk) >= 1.33 ? 'text-emerald-600':'text-rose-600'}">${cpk}</div></div>
+      `;
+
+      chartInstance = new Chart(canvas, {
+        data: {
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Tần suất thực nghiệm',
+              data: binCenters.map((c, i) => ({ x: c, y: bins[i] })),
+              backgroundColor: barColor,
+              borderColor: borderColor,
+              borderWidth: borderWidth,
+              barPercentage: 1.0,
+              categoryPercentage: 1.0
+            },
+            {
+              type: 'line',
+              label: 'Đường phân phối chuẩn (Gauss)',
+              data: gaussData,
+              borderColor: gaussColor,
+              borderWidth: 2,
+              fill: false,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            title: {
+              display: !!mainTitle.trim(),
+              text: mainTitle,
+              font: { family: fontFam, size: titleSize + 3, weight: '800' },
+              color: '#0f172a',
+              padding: { bottom: 15 }
+            },
+            legend: { labels: { font: { family: fontFam, size: tickSize, weight: 'bold' } } }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              ticks: { font: { family: fontFam, size: tickSize } },
+              title: { display: !!axisXTitle.trim(), text: axisXTitle, font: { family: fontFam, size: titleSize, weight: 'bold' } }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { font: { family: fontFam, size: tickSize } },
+              title: { display: !!axisYTitle.trim(), text: axisYTitle, font: { family: fontFam, size: titleSize, weight: 'bold' } }
+            }
+          }
+        }
+      });
+    }
+
+    function downloadChart() {
+      if (!chartInstance) return;
+      const a = document.createElement('a');
+      a.download = `7QC_${currentMode}_${Date.now()}.png`;
+      a.href = chartInstance.toBase64Image();
+      a.click();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      render();
+    });
+  </script>
+</body>
+</html>
