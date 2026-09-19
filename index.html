@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>7 QC Tools - Biểu Đồ Pareto & Histogram</title>
+
+  <!-- Pi Network SDK -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+
   <!-- Tailwind CSS & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -36,13 +40,11 @@
   <!-- Header Điều Khiển -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-5 py-3 flex items-center justify-between shadow-sm">
     <div class="flex items-center space-x-4">
-      <!-- Logo 7 QC Tools -->
       <div class="flex items-center space-x-2.5">
         <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-extrabold text-sm shadow-sm tracking-tighter">7QC</div>
         <span class="font-extrabold text-lg tracking-tight text-slate-900">7 QC Tools</span>
       </div>
 
-      <!-- Nút Chuyển Loại Biểu Đồ -->
       <div class="bg-slate-100 p-1 rounded-xl flex space-x-1 border border-slate-200">
         <button id="btnModePareto" onclick="switchChartType('pareto')" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-black transition">Pareto (80/20)</button>
         <button id="btnModeHist" onclick="switchChartType('histogram')" class="px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-black shadow-sm transition">Histogram + Giới Hạn Min/Max</button>
@@ -50,6 +52,12 @@
     </div>
 
     <div class="flex items-center space-x-2">
+      <!-- Trạng thái xác thực Pi Network -->
+      <div id="piUserBadge" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        <span id="piUserName">Kết nối Pi...</span>
+      </div>
+
       <button onclick="toggleModal(true)" class="px-4 py-2 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl transition flex items-center space-x-2 shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         <span>Dán / Nạp Dữ Liệu</span>
@@ -140,7 +148,6 @@
           <button onclick="resetColors()" class="text-[11px] text-blue-600 hover:underline">Mặc định</button>
         </div>
 
-        <!-- Màu cho Histogram -->
         <div id="colorGroupHist" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
           <div class="flex items-center justify-between">
             <span class="text-xs text-slate-700 font-medium">Màu Cột (Fill)</span>
@@ -171,7 +178,6 @@
           </div>
         </div>
 
-        <!-- Màu cho Pareto -->
         <div id="colorGroupPareto" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200 hidden">
           <div class="flex items-center justify-between">
             <span class="text-xs text-slate-700 font-medium">Lỗi Trọng Yếu (Vital Few)</span>
@@ -250,6 +256,44 @@
   </div>
 
   <script>
+    // --- KHỞI TẠO VÀ XÁC THỰC PI NETWORK SDK ---
+    let piUser = null;
+    let piAccessToken = null;
+
+    async function initPiNetwork() {
+      if (typeof window.Pi === 'undefined') {
+        const badge = document.getElementById('piUserBadge');
+        if (badge) badge.innerHTML = '<span class="text-slate-500">Chế độ Web thông thường</span>';
+        return;
+      }
+
+      try {
+        await window.Pi.init({ version: "2.0" });
+
+        const scopes = ['username'];
+        function onIncompletePaymentFound(payment) {
+          console.log("Incomplete payment found:", payment);
+        }
+
+        const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+        piUser = authResult.user;
+        piAccessToken = authResult.accessToken;
+
+        const badge = document.getElementById('piUserBadge');
+        if (badge && piUser) {
+          badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-900";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>@${piUser.username}</span>`;
+        }
+      } catch (err) {
+        console.warn("Pi Auth warning/cancelled:", err);
+        const badge = document.getElementById('piUserBadge');
+        if (badge) {
+          badge.className = "flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600";
+          badge.innerHTML = `<span>Khách</span>`;
+        }
+      }
+    }
+
     let currentMode = 'histogram';
     let chartInstance = null;
 
@@ -349,7 +393,6 @@
       document.getElementById('colorGroupPareto').classList.toggle('hidden', mode !== 'pareto');
       document.getElementById('cfgGroupY1Title').classList.toggle('hidden', mode !== 'pareto');
 
-      // Tự động điều chỉnh tiêu đề mẫu tương ứng
       if (mode === 'pareto') {
         document.getElementById('cfgMainTitle').value = 'Biểu Đồ Pareto Phân Tích Lỗi Sản Phẩm (Quy Tắc 80/20)';
         document.getElementById('cfgAxisXTitle').value = 'Dạng lỗi / Khuyết tật';
@@ -643,6 +686,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       render();
+      initPiNetwork();
     });
   </script>
 </body>
